@@ -788,38 +788,45 @@
         function renderDocs() { filterDocs(); }
 
         function filterDocs() {
-            const q = (document.getElementById('global-search')?.value || '').trim().toLowerCase();
-            const b = document.getElementById('list-comprobantes');
+            var q = (document.getElementById('global-search') ? document.getElementById('global-search').value : '').trim().toLowerCase();
+            var b = document.getElementById('list-comprobantes');
             if (!b) return;
-            const filtered = q === '' ? state.documents : state.documents.filter(d =>
-                (d.id||'').toLowerCase().includes(q) ||
-                (d.verifCode||'').toLowerCase().includes(q) ||
-                (d.desc||'').toLowerCase().includes(q) ||
-                (d.proveedor||'').toLowerCase().includes(q) ||
-                (d.cliente||'').toLowerCase().includes(q) ||
-                (d.beneficiario||'').toLowerCase().includes(q)
-            );
+            var filtered = q === '' ? state.documents : state.documents.filter(function(d) {
+                return (d.id||'').toLowerCase().indexOf(q) >= 0 ||
+                       (d.verifCode||'').toLowerCase().indexOf(q) >= 0 ||
+                       (d.desc||'').toLowerCase().indexOf(q) >= 0 ||
+                       (d.proveedor||'').toLowerCase().indexOf(q) >= 0 ||
+                       (d.cliente||'').toLowerCase().indexOf(q) >= 0 ||
+                       (d.beneficiario||'').toLowerCase().indexOf(q) >= 0;
+            });
             if (filtered.length === 0) {
                 b.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No se encontro ningun comprobante</td></tr>';
                 return;
             }
-            b.innerHTML = filtered.map(d => {
-                const hlId = q && d.id.toLowerCase().includes(q)
-                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + d.id + '</span>' : d.id;
-                const hlVerif = d.verifCode
-                    ? (q && d.verifCode.toLowerCase().includes(q)
+            var rows = '';
+            for (var i = 0; i < filtered.length; i++) {
+                var d = filtered[i];
+                var safeId = d.id ? d.id.replace(/'/g, '') : '';
+                var hlId = (q && d.id && d.id.toLowerCase().indexOf(q) >= 0)
+                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + d.id + '</span>'
+                    : (d.id || '');
+                var hlVerif = d.verifCode
+                    ? ((q && d.verifCode.toLowerCase().indexOf(q) >= 0)
                         ? ' <span style="background:#C9A84C33;border-radius:3px;padding:1px 4px;font-size:10px;color:#C9A84C;">' + d.verifCode + '</span>'
-                        : ' <span style="font-size:10px;color:#555;">' + d.verifCode + '</span>') : '';
-                return '<tr>'
+                        : ' <span style="font-size:10px;color:#555;">' + d.verifCode + '</span>')
+                    : '';
+                var statusClass = d.status ? d.status.toLowerCase() : 'pendiente';
+                rows += '<tr>'
                     + '<td class="emp-number">' + hlId + hlVerif + '</td>'
                     + '<td><span class="badge ' + getBadge(d.type) + '">' + d.type + '</span></td>'
                     + '<td>' + (d.date||'').replace('T',' ') + '</td>'
                     + '<td>' + (d.depto||'—') + '</td>'
                     + '<td style="font-weight:bold;">' + formatMoney(d.amount, d.currency) + '</td>'
-                    + '<td><span class="status-badge status-' + d.status.toLowerCase() + '">' + d.status + '</span></td>'
-                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printTicket('' + d.id + '')">Imprimir</button></td>'
+                    + '<td><span class="status-badge status-' + statusClass + '">' + d.status + '</span></td>'
+                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printTicket('' + safeId + '')">Imprimir</button></td>'
                     + '</tr>';
-            }).join('');
+            }
+            b.innerHTML = rows;
         }
 
         function getBadge(t) {
@@ -1217,370 +1224,47 @@
         function renderRMA() { filterRMA(); }
 
         function filterRMA() {
-            const q = (document.getElementById('rma-search')?.value || '').trim().toLowerCase();
-            const b = document.getElementById('list-rma');
+            var q = (document.getElementById('rma-search') ? document.getElementById('rma-search').value : '').trim().toLowerCase();
+            var b = document.getElementById('list-rma');
             if (!b) return;
-            const filtered = q === '' ? state.rmaCases : state.rmaCases.filter(r =>
-                (r.id||'').toLowerCase().includes(q) ||
-                (r.cliente||'').toLowerCase().includes(q) ||
-                (r.producto||'').toLowerCase().includes(q) ||
-                (r.marca||'').toLowerCase().includes(q) ||
-                (r.imei||'').toLowerCase().includes(q) ||
-                (r.defecto||'').toLowerCase().includes(q) ||
-                (r.notaCEC||'').toLowerCase().includes(q) ||
-                (r.facturaAbaco||'').toLowerCase().includes(q) ||
-                (r.verifCode||'').toLowerCase().includes(q)
-            );
+            var filtered = q === '' ? state.rmaCases : state.rmaCases.filter(function(r) {
+                return (r.id||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.cliente||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.producto||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.marca||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.imei||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.defecto||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.notaCEC||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.facturaAbaco||'').toLowerCase().indexOf(q) >= 0 ||
+                       (r.verifCode||'').toLowerCase().indexOf(q) >= 0;
+            });
             if (filtered.length === 0) {
                 b.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No se encontro ningun caso RMA</td></tr>';
                 return;
             }
-            b.innerHTML = filtered.map(r => {
-                const days = Math.floor((Date.now() - (r.timestamp||Date.now())) / (1000*60*60*24));
-                let semColor = '#1a6e1a';
+            var rows = '';
+            for (var i = 0; i < filtered.length; i++) {
+                var r = filtered[i];
+                var safeId = r.id ? r.id.replace(/'/g, '') : '';
+                var days = Math.floor((Date.now() - (r.timestamp||Date.now())) / (1000*60*60*24));
+                var semColor = '#1a6e1a';
                 if (days > 7)  semColor = '#8a5a0a';
                 if (days > 15) semColor = '#8a1a1a';
-                const hlId = q && r.id.toLowerCase().includes(q)
-                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + r.id + '</span>' : r.id;
-                const hlVerif = r.verifCode && q && r.verifCode.toLowerCase().includes(q)
+                var hlId = (q && r.id && r.id.toLowerCase().indexOf(q) >= 0)
+                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + r.id + '</span>'
+                    : (r.id || '');
+                var hlVerif = (r.verifCode && q && r.verifCode.toLowerCase().indexOf(q) >= 0)
                     ? ' <span style="background:#C9A84C33;border-radius:3px;padding:1px 4px;font-size:10px;color:#C9A84C;">' + r.verifCode + '</span>'
                     : (r.verifCode ? ' <span style="font-size:10px;color:#555;">' + r.verifCode + '</span>' : '');
-                return '<tr>'
+                rows += '<tr>'
                     + '<td class="emp-number">' + hlId + hlVerif + '</td>'
                     + '<td>' + (r.cliente||'—') + '</td>'
                     + '<td>' + (r.producto||'—') + '</td>'
                     + '<td>' + (r.marca||'—') + '</td>'
-                    + '<td>' + r.status + '</td>'
+                    + '<td>' + (r.status||'—') + '</td>'
                     + '<td><span style="color:' + semColor + ';font-weight:bold;">' + days + ' d</span></td>'
-                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printRMA('' + r.id + '')">Imprimir</button></td>'
+                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printRMA('' + safeId + '')">Imprimir</button></td>'
                     + '</tr>';
-            }).join('');
-        }
-
-        let currentCatView = 'fijos';
-        function renderCategories(type) {
-            currentCatView = type;
-            const c = document.getElementById('categories-container');
-            
-            // Update buttons
-            document.getElementById('btn-cat-fijos').style.background = type === 'fijos' ? 'var(--accent-gold)' : '#333';
-            document.getElementById('btn-cat-fijos').style.color = type === 'fijos' ? '#000' : '#fff';
-            document.getElementById('btn-cat-variables').style.background = type === 'variables' ? 'var(--accent-gold)' : '#333';
-            document.getElementById('btn-cat-variables').style.color = type === 'variables' ? '#000' : '#fff';
-
-            c.innerHTML = Object.keys(state.categories[type]).map(depto => `
-                <div class="stat-card" style="display:flex; flex-direction:column;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <div style="color:var(--accent-gold); font-weight:bold;">${depto}</div>
-                        <button onclick="deleteDepto('${type}', '${depto}')" style="background:none; border:none; color:#8a1a1a; cursor:pointer; font-size:10px;">Eliminar Depto</button>
-                    </div>
-                    <div style="flex:1;">
-                        ${state.categories[type][depto].map(cat => `
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #222; font-size:12px;">
-                                <span>${cat}</span>
-                                <div style="display:flex; gap:8px;">
-                                    <span title="Mover" onclick="moveCategory('${type}', '${depto}', '${cat}')" style="cursor:pointer; color:var(--accent-gold);">⇄</span>
-                                    <span title="Editar" onclick="editCategory('${type}', '${depto}', '${cat}')" style="cursor:pointer; color:#1a4a8a;">✎</span>
-                                    <span title="Eliminar" onclick="deleteCategory('${type}', '${depto}', '${cat}')" style="cursor:pointer; color:#8a1a1a;">✕</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `).join('');
-
-            // Update datalist for deptos
-            const list = document.getElementById('depto-list');
-            const allDeptos = [...new Set([...Object.keys(state.categories.fijos), ...Object.keys(state.categories.variables)])];
-            list.innerHTML = allDeptos.map(d => `<option value="${d}">`).join('');
-        }
-
-        function saveNewCategory() {
-            const type = document.getElementById('new-cat-type').value;
-            const depto = document.getElementById('new-cat-depto').value.trim();
-            const name = document.getElementById('new-cat-name').value.trim();
-
-            if(!depto || !name) return alert('Complete todos los campos');
-
-            if(!state.categories[type][depto]) state.categories[type][depto] = [];
-            state.categories[type][depto].push(name);
-            
-            saveCats();
-            closeModal('modal-add-cat');
-            renderCategories(type);
-            loadSelects();
-        }
-
-        function deleteCategory(type, depto, cat) {
-            if(!confirm(`¿Eliminar categoría "${cat}"?`)) return;
-            state.categories[type][depto] = state.categories[type][depto].filter(c => c !== cat);
-            saveCats();
-            renderCategories(type);
-            loadSelects();
-        }
-
-        function deleteDepto(type, depto) {
-            if(!confirm(`¿Eliminar departamento "${depto}" y todas sus categorías?`)) return;
-            delete state.categories[type][depto];
-            saveCats();
-            renderCategories(type);
-            loadSelects();
-        }
-
-        function editCategory(type, depto, oldCat) {
-            const newName = prompt('Nuevo nombre para la categoría:', oldCat);
-            if(newName && newName !== oldCat) {
-                const idx = state.categories[type][depto].indexOf(oldCat);
-                state.categories[type][depto][idx] = newName;
-                saveCats();
-                renderCategories(type);
-                loadSelects();
             }
+            b.innerHTML = rows;
         }
-
-        function moveCategory(type, depto, cat) {
-            const targetType = type === 'fijos' ? 'variables' : 'fijos';
-            if(!confirm(`¿Mover "${cat}" a Gastos ${targetType.charAt(0).toUpperCase() + targetType.slice(1)}?`)) return;
-            
-            // Remove from current
-            state.categories[type][depto] = state.categories[type][depto].filter(c => c !== cat);
-            if(state.categories[type][depto].length === 0) delete state.categories[type][depto];
-
-            // Add to target
-            if(!state.categories[targetType][depto]) state.categories[targetType][depto] = [];
-            state.categories[targetType][depto].push(cat);
-
-            saveCats();
-            renderCategories(type);
-            loadSelects();
-        }
-
-        function saveCats() {
-            localStorage.setItem('emp_categories', JSON.stringify(state.categories));
-        }
-
-        function renderReports() {
-            const ctx1 = document.getElementById('chart-bar').getContext('2d');
-            const ctx2 = document.getElementById('chart-donut').getContext('2d');
-            new Chart(ctx1, { type: 'bar', data: { labels: ['Admin', 'Logística', 'Mkt'], datasets: [{ label: 'Gastos', data: [12, 19, 3], backgroundColor: '#C9A84C' }] } });
-            new Chart(ctx2, { type: 'doughnut', data: { labels: ['Fijos', 'Variables'], datasets: [{ data: [60, 40], backgroundColor: ['#C9A84C', '#333'] }] } });
-        }
-
-        // ── CONFIG TABS ──────────────────────────────────────────
-        function cfgTab(tab) {
-            document.getElementById('cfg-panel-users').style.display  = tab === 'users'  ? '' : 'none';
-            document.getElementById('cfg-panel-brands').style.display = tab === 'brands' ? '' : 'none';
-            document.getElementById('cfg-tab-users').style.background  = tab === 'users'  ? 'var(--accent-gold)' : '#333';
-            document.getElementById('cfg-tab-users').style.color       = tab === 'users'  ? '#000' : '#fff';
-            document.getElementById('cfg-tab-brands').style.background = tab === 'brands' ? 'var(--accent-gold)' : '#333';
-            document.getElementById('cfg-tab-brands').style.color      = tab === 'brands' ? '#000' : '#fff';
-            if (tab === 'brands') renderBrands();
-            if (tab === 'users')  renderUsersTable();
-        }
-
-        // ── USERS ────────────────────────────────────────────────
-        function saveUsers() {
-            localStorage.setItem('emp_users', JSON.stringify(state.users));
-        }
-
-        function renderUsersTable() {
-            const isAdmin = state.currentUser.role === 'admin';
-            // Show/hide create button based on role
-            const btnNew = document.getElementById('btn-new-user');
-            if (btnNew) btnNew.style.display = isAdmin ? '' : 'none';
-            const tbody = document.getElementById('config-users-table');
-            tbody.innerHTML = state.users.map((u, i) => {
-                const isSelf = u.name === state.currentUser.name;
-                const roleBadge = u.role === 'admin'
-                    ? `<span class="badge badge-gold">Admin</span>`
-                    : `<span class="badge badge-gray">Operador</span>`;
-                const actions = [];
-                // Anyone can change their own password
-                if (isSelf) {
-                    actions.push(`<button class="btn-primary" style="padding:4px 10px; font-size:10px;" onclick="openModal('modal-change-pw')">Mi contraseña</button>`);
-                }
-                // Admin can edit/delete other users (not themselves for delete)
-                if (isAdmin && !isSelf) {
-                    actions.push(`<button class="btn-primary" style="padding:4px 10px; font-size:10px;" onclick="editUser(${i})">Editar</button>`);
-                    actions.push(`<button class="btn-primary" style="padding:4px 10px; font-size:10px; background:#8a1a1a; color:#fff;" onclick="deleteUser(${i})">Eliminar</button>`);
-                }
-                // Admin can reset password of others
-                if (isAdmin && !isSelf) {
-                    actions.push(`<button class="btn-primary" style="padding:4px 10px; font-size:10px; background:#1a4a8a; color:#fff;" onclick="resetPasswordAdmin(${i})">Cambiar contraseña</button>`);
-                }
-                return `<tr>
-                    <td style="font-weight:600;">${u.name} ${isSelf ? '<span style="font-size:10px; color:var(--accent-gold);">(yo)</span>' : ''}</td>
-                    <td>${roleBadge}</td>
-                    <td style="display:flex; gap:6px; flex-wrap:wrap;">${actions.join('')}</td>
-                </tr>`;
-            }).join('');
-        }
-
-        function resetUserModal() {
-            document.getElementById('user-edit-index').value = '-1';
-            document.getElementById('modal-user-title').innerText = 'Nuevo Usuario';
-            document.getElementById('user-name').value = '';
-            document.getElementById('user-password').value = '';
-            document.getElementById('user-password2').value = '';
-            document.getElementById('user-role').value = 'operator';
-            document.getElementById('user-name').disabled = false;
-            document.getElementById('user-modal-error').style.display = 'none';
-        }
-
-        function editUser(idx) {
-            const u = state.users[idx];
-            document.getElementById('user-edit-index').value = idx;
-            document.getElementById('modal-user-title').innerText = 'Editar Usuario';
-            document.getElementById('user-name').value = u.name;
-            document.getElementById('user-name').disabled = true; // can't rename
-            document.getElementById('user-password').value = '';
-            document.getElementById('user-password2').value = '';
-            document.getElementById('user-role').value = u.role;
-            document.getElementById('user-modal-error').style.display = 'none';
-            openModal('modal-user');
-        }
-
-        function saveUser() {
-            const idx  = parseInt(document.getElementById('user-edit-index').value);
-            const name = document.getElementById('user-name').value.trim().toUpperCase();
-            const pw   = document.getElementById('user-password').value;
-            const pw2  = document.getElementById('user-password2').value;
-            const role = document.getElementById('user-role').value;
-            const errEl = document.getElementById('user-modal-error');
-
-            const showErr = (msg) => { errEl.innerText = msg; errEl.style.display = 'block'; };
-
-            if (idx === -1) {
-                // CREATE
-                if (!name) return showErr('El nombre de usuario es requerido.');
-                if (state.users.find(u => u.name === name)) return showErr('Ya existe un usuario con ese nombre.');
-                if (!pw) return showErr('La contraseña es requerida.');
-                if (pw !== pw2) return showErr('Las contraseñas no coinciden.');
-                state.users.push({ name, password: pw, role });
-            } else {
-                // EDIT — only role (and optional new password)
-                if (pw || pw2) {
-                    if (pw !== pw2) return showErr('Las contraseñas no coinciden.');
-                    if (pw.length < 4) return showErr('La contraseña debe tener al menos 4 caracteres.');
-                    state.users[idx].password = pw;
-                }
-                state.users[idx].role = role;
-            }
-
-            saveUsers();
-            closeModal('modal-user');
-            resetUserModal();
-            renderUsersTable();
-            toast(idx === -1 ? `Usuario ${name} creado` : 'Usuario actualizado');
-        }
-
-        function deleteUser(idx) {
-            const u = state.users[idx];
-            if (!confirm(`¿Eliminar al usuario "${u.name}"? Esta acción no se puede deshacer.`)) return;
-            state.users.splice(idx, 1);
-            saveUsers();
-            renderUsersTable();
-            toast('Usuario eliminado');
-        }
-
-        function resetPasswordAdmin(idx) {
-            const u = state.users[idx];
-            const newPw = prompt(`Nueva contraseña para ${u.name}:`);
-            if (!newPw) return;
-            if (newPw.length < 4) return alert('La contraseña debe tener al menos 4 caracteres.');
-            state.users[idx].password = newPw;
-            saveUsers();
-            toast(`Contraseña de ${u.name} actualizada`);
-        }
-
-        function saveOwnPassword() {
-            const cur  = document.getElementById('cpw-current').value;
-            const nw   = document.getElementById('cpw-new').value;
-            const nw2  = document.getElementById('cpw-new2').value;
-            const errEl = document.getElementById('cpw-error');
-            const showErr = (msg) => { errEl.innerText = msg; errEl.style.display = 'block'; };
-
-            const me = state.users.find(u => u.name === state.currentUser.name);
-            if (!me || me.password !== cur) return showErr('La contraseña actual es incorrecta.');
-            if (!nw) return showErr('Ingresá la nueva contraseña.');
-            if (nw !== nw2) return showErr('Las contraseñas nuevas no coinciden.');
-            if (nw.length < 4) return showErr('La contraseña debe tener al menos 4 caracteres.');
-
-            me.password = nw;
-            saveUsers();
-            closeModal('modal-change-pw');
-            document.getElementById('cpw-current').value = '';
-            document.getElementById('cpw-new').value = '';
-            document.getElementById('cpw-new2').value = '';
-            errEl.style.display = 'none';
-            toast('Contraseña actualizada correctamente');
-        }
-
-        // ── BRANDS ───────────────────────────────────────────────
-        function renderConfig() {
-            renderBrands();
-            renderUsersTable();
-        }
-
-        function renderBrands() {
-            document.getElementById('config-brands').innerHTML = state.brands.map((b,i) => `
-                <span class="badge badge-gray" style="display:inline-flex; align-items:center; gap:6px;">
-                    ${b}
-                    <span onclick="deleteBrand(${i})" style="cursor:pointer; color:#ef5350; font-size:10px; margin-left:4px;">✕</span>
-                </span>`).join('');
-        }
-
-        function addBrand() {
-            const b = document.getElementById('new-brand').value.trim();
-            if (!b) return;
-            if (state.brands.includes(b)) return toast('Esa marca ya existe');
-            state.brands.push(b);
-            localStorage.setItem('emp_brands', JSON.stringify(state.brands));
-            document.getElementById('new-brand').value = '';
-            renderBrands();
-            toast('Marca añadida');
-        }
-
-        function deleteBrand(i) {
-            if (!confirm(`¿Eliminar la marca "${state.brands[i]}"?`)) return;
-            state.brands.splice(i, 1);
-            localStorage.setItem('emp_brands', JSON.stringify(state.brands));
-            renderBrands();
-        }
-
-        // ── TOAST ────────────────────────────────────────────────
-        function toast(msg) {
-            const t = document.createElement('div');
-            t.innerText = msg;
-            t.style.cssText = `position:fixed; bottom:24px; right:24px; background:#141414;
-                border:1px solid var(--accent-gold); color:var(--text-main);
-                padding:12px 20px; border-radius:6px; font-size:13px;
-                z-index:9999; animation:fadeIn .3s ease;`;
-            document.body.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
-
-        function togglePw(id) {
-            const input = document.getElementById(id);
-            const eye   = document.getElementById('eye-' + id);
-            if (input.type === 'password') {
-                input.type = 'text';
-                eye.innerText = '🙈';
-            } else {
-                input.type = 'password';
-                eye.innerText = '👁';
-            }
-        }
-
-        function resetAcceso() {
-            if (!confirm('Esto va a resetear los usuarios a los valores por defecto. Contrasenas: admin123 / berna123 / pablo123. Continuar?')) return;
-            localStorage.removeItem('emp_users');
-            location.reload();
-        }
-
-        function logout() { location.reload(); }
-
-        init();
-    </script>
-</body>
-</html>
