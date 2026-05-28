@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <title>Empire Comprobantes — Empire Shop</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&family=Courier+Prime&display=swap" rel="stylesheet">
@@ -104,9 +105,22 @@
 </head>
 <body>
 
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="diamond-logo"></div>
+            <div class="brand-name">Empire Shop</div>
+            <div class="brand-subtitle">Sistema de Gestión</div>
+            <form class="login-form" id="login-form">
+                <input type="text" id="username" placeholder="Usuario" required autocomplete="username">
+                <div class="pw-wrap"><input type="password" id="password" placeholder="Contraseña" required><span class="pw-eye" onclick="togglePw('password')" id="eye-password">👁</span></div>
+                <button type="submit" class="btn-primary">Ingresar</button>
+                <p class="error-message" id="login-error">Usuario o contrasena incorrectos</p>
+                <p style="text-align:center;margin-top:14px;"><span onclick="resetAcceso()" style="color:#888;font-size:11px;cursor:pointer;text-decoration:underline;">Problemas para entrar? Resetear acceso</span></p>
+            </form>
+        </div>
+    </div>
 
-
-    <div id="main-app" style="display:flex; width:100%; height:100vh;">
+    <div id="main-app">
         <div class="sidebar">
             <div style="padding: 30px 20px; border-bottom: 1px solid var(--border-color);">
                 <div class="brand-name" style="font-size: 18px;">Empire Shop</div>
@@ -124,13 +138,13 @@
                 <div style="font-size: 14px; font-weight: 600;" id="display-user-name">Usuario</div>
                 <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;" id="display-user-role">Rol</div>
                 <div style="color: var(--text-secondary); cursor: pointer; font-size: 12px; margin-top: 10px;" onclick="openModal('modal-change-pw')">Cambiar contraseña</div>
-                
+                <div style="color: var(--text-secondary); cursor: pointer; font-size: 12px; margin-top: 6px;" onclick="logout()">Cerrar Sesión</div>
             </div>
         </div>
 
         <div class="content-main">
             <header class="header-top">
-                <input type="text" id="global-search" style="background: #1a1a1a; border: 1px solid var(--border-color); padding: 8px 12px; color: white; width: 320px; border-radius:4px;" placeholder="Buscar por N° nota o cod. verificacion..." oninput="filterDocs()">
+                <input type="text" id="global-search" style="background: #1a1a1a; border: 1px solid var(--border-color); padding: 8px; color: white; width: 300px;" placeholder="Buscar EMP-..." oninput="filterDocs()">
                 <button class="btn-primary" style="width: auto; padding: 8px 20px;" onclick="openModal('modal-comprobante')">+ Nuevo Comprobante</button>
             </header>
 
@@ -160,17 +174,9 @@
                 </section>
                 
                 <section id="view-rma" class="view-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h1 style="font-family: 'Playfair Display'; color: var(--accent-gold);">Gestión de RMA</h1>
                         <button class="btn-primary" style="width: auto; padding: 8px 20px;" onclick="openModal('modal-rma')">+ Nuevo RMA</button>
-                    </div>
-                    <div style="margin-bottom: 16px;">
-                        <input type="text" id="rma-search"
-                            style="background:#1a1a1a; border:1px solid var(--border-color);
-                                   padding:8px 12px; color:white; width:100%; border-radius:4px;
-                                   box-sizing:border-box;"
-                            placeholder="Buscar por N° RMA, cliente, producto, IMEI, cod. verificacion..."
-                            oninput="filterRMA()">
                     </div>
                     <div class="table-container">
                         <table>
@@ -462,8 +468,8 @@
         // ── DEFAULT USERS ─────────────────────────────────────────
         const DEFAULT_USERS = [
             { name: 'AGUSTIN', password: 'admin123', role: 'admin' },
-            { name: 'BERNA',   password: 'berna123', role: 'operator' },
-            { name: 'PABLO',   password: 'pablo123', role: 'operator' },
+            { name: 'BERNA',   password: 'Berna123', role: 'operator' },
+            { name: 'PABLO',   password: 'Pablo123', role: 'operator' },
         ];
 
         // Always write DEFAULT_USERS to ensure clean state
@@ -478,6 +484,127 @@
                 localStorage.setItem('emp_users', JSON.stringify(DEFAULT_USERS));
             }
         })();
+
+        // ── SUPABASE CONFIG ──────────────────────────────────────
+        const SUPA_URL = 'https://ebrcugksmbylnecfqpwq.supabase.co';
+        const SUPA_KEY = 'sb_publishable_C43LR3lP5-G0te36rpBLBQ_-7S-y9_b';
+        const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+        // ── SUPABASE SYNC HELPERS ─────────────────────────────────
+        async function sbSaveDoc(doc) {
+            try {
+                await supa.from('documents').upsert({
+                    id: doc.id, type: doc.type, date_str: doc.date,
+                    user_name: doc.user, expense_type: doc.expenseType,
+                    depto: doc.depto, cat: doc.cat, description: doc.desc,
+                    currency: doc.currency, amount: doc.amount,
+                    metodo: doc.metodo, proveedor: doc.proveedor,
+                    ruc: doc.ruc, cliente: doc.cliente,
+                    cliente_doc: doc.clienteDoc, ref_factura: doc.refFactura,
+                    beneficiario: doc.beneficiario, status: doc.status,
+                    approved_by: doc.approvedBy, approved_at: doc.approvedAt,
+                    rejected_by: doc.rejectedBy, rejected_at: doc.rejectedAt,
+                    rejection_reason: doc.rejectionReason,
+                    executed_by: doc.executedBy, executed_at: doc.executedAt,
+                    voided_by: doc.voidedBy, voided_at: doc.voidedAt,
+                    void_reason: doc.voidReason, verif_code: doc.verifCode,
+                    rma_linked: doc.rmaLinked
+                });
+            } catch(e) { console.warn('Supabase save doc error:', e); }
+        }
+
+        async function sbSaveRMA(r) {
+            try {
+                await supa.from('rma_cases').upsert({
+                    id: r.id, case_type: r.caseType, quantity: r.quantity,
+                    entry_date: r.fechaIngreso, created_by: r.createdBy,
+                    cliente: r.cliente, cliente_doc: r.clienteDoc,
+                    cliente_tel: r.clienteTel, product_category: r.categoria,
+                    brand: r.marca, supplier: r.proveedor,
+                    product_name: r.producto, product_code: r.codigoInterno,
+                    imei: r.imei, barcode: r.codigoBarras,
+                    nota_cec: r.notaCEC, factura_abaco: r.facturaAbaco,
+                    defecto: r.defecto, condition_entry: r.condicion,
+                    observation: r.observacion, status: r.status,
+                    resolution: r.resolucion, resolution_notes: r.resolucionNotes,
+                    verif_code: r.verifCode
+                });
+            } catch(e) { console.warn('Supabase save RMA error:', e); }
+        }
+
+        async function sbLoadAll() {
+            try {
+                const [docsRes, rmaRes, brandsRes] = await Promise.all([
+                    supa.from('documents').select('*').order('created_at', {ascending: false}),
+                    supa.from('rma_cases').select('*').order('created_at', {ascending: false}),
+                    supa.from('brands').select('*').order('name')
+                ]);
+
+                if (docsRes.data && docsRes.data.length > 0) {
+                    state.documents = docsRes.data.map(d => ({
+                        id: d.id, type: d.type, date: d.date_str,
+                        user: d.user_name, expenseType: d.expense_type,
+                        depto: d.depto, cat: d.cat, desc: d.description,
+                        currency: d.currency, amount: d.amount,
+                        metodo: d.metodo, proveedor: d.proveedor,
+                        ruc: d.ruc, cliente: d.cliente,
+                        clienteDoc: d.cliente_doc, refFactura: d.ref_factura,
+                        beneficiario: d.beneficiario, status: d.status,
+                        approvedBy: d.approved_by, approvedAt: d.approved_at,
+                        rejectedBy: d.rejected_by, rejectedAt: d.rejected_at,
+                        rejectionReason: d.rejection_reason,
+                        executedBy: d.executed_by, executedAt: d.executed_at,
+                        voidedBy: d.voided_by, voidedAt: d.voided_at,
+                        voidReason: d.void_reason, verifCode: d.verif_code,
+                        rmaLinked: d.rma_linked
+                    }));
+                    // Update counter
+                    const nums = state.documents.map(d => {
+                        const m = d.id.match(/(\d+)$/);
+                        return m ? parseInt(m[1]) : 0;
+                    });
+                    state.counter = Math.max(...nums, state.counter) + 1;
+                    localStorage.setItem('emp_docs', JSON.stringify(state.documents));
+                }
+
+                if (rmaRes.data && rmaRes.data.length > 0) {
+                    state.rmaCases = rmaRes.data.map(r => ({
+                        id: r.id, caseType: r.case_type, quantity: r.quantity,
+                        fechaIngreso: r.entry_date, createdBy: r.created_by,
+                        cliente: r.cliente, clienteDoc: r.cliente_doc,
+                        clienteTel: r.cliente_tel, categoria: r.product_category,
+                        marca: r.brand, proveedor: r.supplier,
+                        producto: r.product_name, codigoInterno: r.product_code,
+                        imei: r.imei, codigoBarras: r.barcode,
+                        notaCEC: r.nota_cec, facturaAbaco: r.factura_abaco,
+                        defecto: r.defecto, condicion: r.condition,
+                        observacion: r.observation, status: r.status,
+                        resolucion: r.resolution, resolucionNotes: r.resolution_notes,
+                        verifCode: r.verif_code,
+                        timestamp: new Date(r.created_at).getTime()
+                    }));
+                    const rNums = state.rmaCases.map(r => {
+                        const m = r.id.match(/(\d+)$/);
+                        return m ? parseInt(m[1]) : 0;
+                    });
+                    state.rmaCounter = Math.max(...rNums, state.rmaCounter) + 1;
+                    localStorage.setItem('rma_cases', JSON.stringify(state.rmaCases));
+                }
+
+                if (brandsRes.data && brandsRes.data.length > 0) {
+                    state.brands = brandsRes.data.map(b => b.name);
+                    localStorage.setItem('emp_brands', JSON.stringify(state.brands));
+                }
+
+                console.log('Supabase sync OK — docs:', state.documents.length, 'RMA:', state.rmaCases.length);
+                updateDashboard();
+                renderDocs();
+                renderRMA();
+                renderBrands();
+            } catch(e) {
+                console.warn('Supabase load error, using localStorage:', e);
+            }
+        }
 
         let state = {
             currentUser: null,
@@ -518,16 +645,18 @@
         function init() {
             document.getElementById('login-form').onsubmit = (e) => {
                 e.preventDefault();
+                const u = document.getElementById('username').value.trim();
                 const p = document.getElementById('password').value;
-                // Find user by password only (no username needed)
+                const normalize = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
                 const freshUsers = JSON.parse(localStorage.getItem('emp_users')) || DEFAULT_USERS;
                 state.users = freshUsers;
-                const found = freshUsers.find(x => x.password === p);
+                const found = freshUsers.find(x => normalize(x.name) === normalize(u) && x.password === p);
                 if (!found) {
                     document.getElementById('login-error').style.display = 'block';
                     return;
                 }
-                document.getElementById('login-error').style.display = 'none';           state.currentUser = { name: found.name, role: found.role };
+                document.getElementById('login-error').style.display = 'none';
+                state.currentUser = { name: found.name, role: found.role };
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-app').style.display = 'flex';
                 document.getElementById('display-user-name').innerText = state.currentUser.name;
@@ -538,12 +667,9 @@
                 });
                 updateDashboard();
                 loadSelects();
+                // Load data from Supabase after login
+                sbLoadAll();
             };
-            // Auto-login as AGUSTÍN (solo uso admin)
-            state.currentUser = { name: 'AGUSTIN', role: 'admin' };
-            document.getElementById('display-user-name').innerText = 'AGUSTIN';
-            document.getElementById('display-user-role').innerText = 'admin';
-
             document.getElementById('comp-fecha').value = new Date().toISOString().slice(0, 16);
             updateFormFields();
 
@@ -623,15 +749,7 @@
             const beneficiario = benSel === 'otro' ? benOtro : benSel;
 
             const doc = {
-                id:           (function(t) {
-                    const n = state.counter.toString().padStart(5, '0');
-                    if (t === 'NOTA CRÉDITO CLIENTE' || t === 'NOTA CREDITO CLIENTE')   return 'EMP-NC-' + n;
-                    if (t === 'NOTA CRÉDITO PROVEEDOR' || t === 'NOTA CREDITO PROVEEDOR') return 'EMP-NC-' + n;
-                    if (t === 'VALE INTERNO')         return 'EMP-VI-' + n;
-                    if (t === 'RECIBO DE COBRO')      return 'EMP-RC-' + n;
-                    if (t === 'RECIBO DE PAGO')       return 'EMP-RP-' + n;
-                    return 'EMP-' + n;   // COMPROBANTE DE PAGO y otros
-                })(tipo),
+                id:           'EMP-' + state.counter.toString().padStart(5, '0'),
                 type:         tipo,
                 date:         document.getElementById('comp-fecha').value,
                 currency:     document.getElementById('comp-moneda').value,
@@ -656,6 +774,7 @@
             state.counter++;
             localStorage.setItem('emp_docs', JSON.stringify(state.documents));
             localStorage.setItem('emp_count', state.counter);
+            sbSaveDoc(doc); // sync to Supabase
             closeModal('modal-comprobante');
             // Reset form
             document.getElementById('form-comprobante').reset();
@@ -666,46 +785,40 @@
             toast('Comprobante creado — ' + doc.id);
         }
 
-        function renderDocs() {
-            filterDocs();
-        }
+        function renderDocs() { filterDocs(); }
 
         function filterDocs() {
             const q = (document.getElementById('global-search')?.value || '').trim().toLowerCase();
             const b = document.getElementById('list-comprobantes');
             if (!b) return;
-
-            const filtered = q === '' ? state.documents : state.documents.filter(d => {
-                const idMatch     = d.id.toLowerCase().includes(q);
-                const verifMatch  = d.verifCode && d.verifCode.toLowerCase().includes(q);
-                const descMatch   = (d.desc || '').toLowerCase().includes(q);
-                const provMatch   = (d.proveedor || '').toLowerCase().includes(q);
-                const cliMatch    = (d.cliente || '').toLowerCase().includes(q);
-                const benMatch    = (d.beneficiario || '').toLowerCase().includes(q);
-                return idMatch || verifMatch || descMatch || provMatch || cliMatch || benMatch;
-            });
-
+            const filtered = q === '' ? state.documents : state.documents.filter(d =>
+                (d.id||'').toLowerCase().includes(q) ||
+                (d.verifCode||'').toLowerCase().includes(q) ||
+                (d.desc||'').toLowerCase().includes(q) ||
+                (d.proveedor||'').toLowerCase().includes(q) ||
+                (d.cliente||'').toLowerCase().includes(q) ||
+                (d.beneficiario||'').toLowerCase().includes(q)
+            );
             if (filtered.length === 0) {
-                b.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888; padding:20px;">No se encontro ningun comprobante</td></tr>';
+                b.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No se encontro ningun comprobante</td></tr>';
                 return;
             }
-
             b.innerHTML = filtered.map(d => {
-                const highlightId    = q && d.id.toLowerCase().includes(q)    ? '<span style="background:#C9A84C22; border-radius:3px; padding:1px 3px;">' + d.id + '</span>' : d.id;
-                const highlightVerif = d.verifCode
+                const hlId = q && d.id.toLowerCase().includes(q)
+                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + d.id + '</span>' : d.id;
+                const hlVerif = d.verifCode
                     ? (q && d.verifCode.toLowerCase().includes(q)
-                        ? ' <span style="background:#C9A84C33; border-radius:3px; padding:1px 4px; font-size:10px; color:#C9A84C;">' + d.verifCode + '</span>'
-                        : ' <span style="font-size:10px; color:#666;">' + d.verifCode + '</span>')
-                    : '';
+                        ? ' <span style="background:#C9A84C33;border-radius:3px;padding:1px 4px;font-size:10px;color:#C9A84C;">' + d.verifCode + '</span>'
+                        : ' <span style="font-size:10px;color:#555;">' + d.verifCode + '</span>') : '';
                 return '<tr>'
-                     + '<td class="emp-number">' + highlightId + highlightVerif + '</td>'
-                     + '<td><span class="badge ' + getBadge(d.type) + '">' + d.type + '</span></td>'
-                     + '<td>' + (d.date||'').replace('T',' ') + '</td>'
-                     + '<td>' + (d.depto||'—') + '</td>'
-                     + '<td style="font-weight:bold;">' + formatMoney(d.amount, d.currency) + '</td>'
-                     + '<td><span class="status-badge status-' + d.status.toLowerCase() + '">' + d.status + '</span></td>'
-                     + '<td><button class="btn-primary" style="padding:4px 8px; font-size:10px;" onclick="printTicket('' + d.id + '')">Imprimir</button></td>'
-                     + '</tr>';
+                    + '<td class="emp-number">' + hlId + hlVerif + '</td>'
+                    + '<td><span class="badge ' + getBadge(d.type) + '">' + d.type + '</span></td>'
+                    + '<td>' + (d.date||'').replace('T',' ') + '</td>'
+                    + '<td>' + (d.depto||'—') + '</td>'
+                    + '<td style="font-weight:bold;">' + formatMoney(d.amount, d.currency) + '</td>'
+                    + '<td><span class="status-badge status-' + d.status.toLowerCase() + '">' + d.status + '</span></td>'
+                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printTicket('' + d.id + '')">Imprimir</button></td>'
+                    + '</tr>';
             }).join('');
         }
 
@@ -749,7 +862,7 @@
 
         function ticketHeader(docType) {
             return '<div style="text-align:center; margin-bottom:8px;">'
-                 + '<div style="font-size:28px; font-weight:900; letter-spacing:5px; line-height:1.1; text-shadow:none;">EMPIRE SHOP</div>'
+                 + '<div style="font-size:28px; font-weight:bold; letter-spacing:5px; line-height:1.1;">EMPIRE SHOP</div>'
                  + '<div style="font-size:8px; letter-spacing:1px; margin-top:2px;">Edificio Jebai - Ciudad del Este, PY</div>'
                  + '<div style="font-size:10px; font-weight:bold; margin-top:5px; letter-spacing:2px;">' + docType + '</div>'
                  + '</div>'
@@ -1002,16 +1115,14 @@
                 + '<meta charset="UTF-8">'
                 + '<title>' + title + '<\/title>'
                 + '<style>'
-                + '@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700;900&display=swap");'
                 + '@page{size:80mm auto;margin:0mm}'
                 + 'html,body{margin:0;padding:0}'
                 + 'body{'
-                + 'font-family:"Roboto Mono","Consolas","Lucida Console","Courier New",monospace;'
-                + 'font-size:12px;font-weight:500;color:#000;background:#fff;'
+                + 'font-family:"Courier New",Courier,monospace;'
+                + 'font-size:11px;color:#000;background:#fff;'
                 + 'width:72mm;padding:3mm 4mm;'
-                + 'line-height:1.6;box-sizing:border-box}'
-                + 'b{font-weight:800}'
-                + 'div{word-break:break-word}'
+                + 'line-height:1.5;box-sizing:border-box}'
+                + 'b{font-weight:bold}'
                 + '<\/style><\/head>'
                 + '<body>' + bodyHTML + '<\/body><\/html>'
             );
@@ -1076,6 +1187,7 @@
                 doc.rejectionReason = reason;
             }
             localStorage.setItem('emp_docs', JSON.stringify(state.documents));
+            sbSaveDoc(doc); // sync to Supabase
             renderAprobaciones();
             renderDocs();
             updateDashboard();
@@ -1091,66 +1203,57 @@
                 factura: document.getElementById('rma-factura').value,
                 defecto: document.getElementById('rma-defecto').value,
                 status: 'RECEPCIÓN',
-                verifCode: genVerifCode(),
                 timestamp: Date.now()
             };
             state.rmaCases.push(r);
             state.rmaCounter++;
             localStorage.setItem('rma_cases', JSON.stringify(state.rmaCases));
             localStorage.setItem('rma_count', state.rmaCounter);
+            sbSaveRMA(newCase); // sync to Supabase
             closeModal('modal-rma');
             renderRMA();
         }
 
-        function renderRMA() {
-            filterRMA();
-        }
+        function renderRMA() { filterRMA(); }
 
         function filterRMA() {
-            const q   = (document.getElementById('rma-search')?.value || '').trim().toLowerCase();
-            const b   = document.getElementById('list-rma');
+            const q = (document.getElementById('rma-search')?.value || '').trim().toLowerCase();
+            const b = document.getElementById('list-rma');
             if (!b) return;
-
-            const filtered = q === '' ? state.rmaCases : state.rmaCases.filter(r => {
-                return (r.id            || '').toLowerCase().includes(q)
-                    || (r.cliente       || '').toLowerCase().includes(q)
-                    || (r.producto      || '').toLowerCase().includes(q)
-                    || (r.marca         || '').toLowerCase().includes(q)
-                    || (r.imei          || '').toLowerCase().includes(q)
-                    || (r.defecto       || '').toLowerCase().includes(q)
-                    || (r.notaCEC       || '').toLowerCase().includes(q)
-                    || (r.facturaAbaco  || '').toLowerCase().includes(q)
-                    || (r.verifCode     || '').toLowerCase().includes(q);
-            });
-
+            const filtered = q === '' ? state.rmaCases : state.rmaCases.filter(r =>
+                (r.id||'').toLowerCase().includes(q) ||
+                (r.cliente||'').toLowerCase().includes(q) ||
+                (r.producto||'').toLowerCase().includes(q) ||
+                (r.marca||'').toLowerCase().includes(q) ||
+                (r.imei||'').toLowerCase().includes(q) ||
+                (r.defecto||'').toLowerCase().includes(q) ||
+                (r.notaCEC||'').toLowerCase().includes(q) ||
+                (r.facturaAbaco||'').toLowerCase().includes(q) ||
+                (r.verifCode||'').toLowerCase().includes(q)
+            );
             if (filtered.length === 0) {
-                b.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888; padding:20px;">No se encontro ningun caso RMA</td></tr>';
+                b.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No se encontro ningun caso RMA</td></tr>';
                 return;
             }
-
             b.innerHTML = filtered.map(r => {
-                const days  = Math.floor((Date.now() - r.timestamp) / (1000*60*60*24));
+                const days = Math.floor((Date.now() - (r.timestamp||Date.now())) / (1000*60*60*24));
                 let semColor = '#1a6e1a';
                 if (days > 7)  semColor = '#8a5a0a';
                 if (days > 15) semColor = '#8a1a1a';
-
-                // Highlight matching ID or verifCode
-                const hlId    = q && r.id.toLowerCase().includes(q)
-                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + r.id + '</span>'
-                    : r.id;
+                const hlId = q && r.id.toLowerCase().includes(q)
+                    ? '<span style="background:#C9A84C22;border-radius:3px;padding:1px 3px;">' + r.id + '</span>' : r.id;
                 const hlVerif = r.verifCode && q && r.verifCode.toLowerCase().includes(q)
                     ? ' <span style="background:#C9A84C33;border-radius:3px;padding:1px 4px;font-size:10px;color:#C9A84C;">' + r.verifCode + '</span>'
                     : (r.verifCode ? ' <span style="font-size:10px;color:#555;">' + r.verifCode + '</span>' : '');
-
                 return '<tr>'
-                     + '<td class="emp-number">' + hlId + hlVerif + '</td>'
-                     + '<td>' + (r.cliente  || '—') + '</td>'
-                     + '<td>' + (r.producto || '—') + '</td>'
-                     + '<td>' + (r.marca    || '—') + '</td>'
-                     + '<td>' + r.status + '</td>'
-                     + '<td><span style="color:' + semColor + ';font-weight:bold;">' + days + ' d</span></td>'
-                     + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printRMA('' + r.id + '')">Imprimir</button></td>'
-                     + '</tr>';
+                    + '<td class="emp-number">' + hlId + hlVerif + '</td>'
+                    + '<td>' + (r.cliente||'—') + '</td>'
+                    + '<td>' + (r.producto||'—') + '</td>'
+                    + '<td>' + (r.marca||'—') + '</td>'
+                    + '<td>' + r.status + '</td>'
+                    + '<td><span style="color:' + semColor + ';font-weight:bold;">' + days + ' d</span></td>'
+                    + '<td><button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="printRMA('' + r.id + '')">Imprimir</button></td>'
+                    + '</tr>';
             }).join('');
         }
 
