@@ -352,25 +352,28 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ═══════════════════════════════════════
 // USERS
 // ═══════════════════════════════════════
-var USERS = [
-  {name:'AGUSTIN', pw:'admin123', role:'admin'},
-  {name:'BERNA',   pw:'Berna123', role:'operator'},
-  {name:'PABLO',   pw:'Pablo123', role:'operator'}
-];
-
-function loadUsers() {
-  try {
-    var s = JSON.parse(localStorage.getItem('emp_users'));
-    if (Array.isArray(s) && s.length > 0) USERS = s;
-  } catch(e) {}
-}
+function loadUsers() {} // already loaded above
 function saveUsers() { localStorage.setItem('emp_users', JSON.stringify(USERS)); }
 
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
+// Load users from localStorage first
+var USERS = (function(){
+    try {
+        var s = JSON.parse(localStorage.getItem('emp_users'));
+        if (Array.isArray(s) && s.length > 0) return s;
+    } catch(e) {}
+    return [
+        {name:'AGUSTIN', pw:'admin123', role:'admin'},
+        {name:'BERNA',   pw:'Berna123', role:'operator'},
+        {name:'PABLO',   pw:'Pablo123', role:'operator'}
+    ];
+})();
+
 var S = {
   user: null,
+  get users() { return USERS; },
   docs: JSON.parse(localStorage.getItem('emp_docs')) || [],
   cnt:  parseInt(localStorage.getItem('emp_cnt')) || 1,
   rmas: JSON.parse(localStorage.getItem('emp_rmas')) || [],
@@ -406,6 +409,8 @@ function norm(s) {
 function doLogin() {
   var u = document.getElementById('lu').value.trim();
   var p = document.getElementById('lp').value;
+  // Reload from localStorage in case updated
+  try { var fresh=JSON.parse(localStorage.getItem('emp_users')); if(Array.isArray(fresh)&&fresh.length>0) { USERS.length=0; fresh.forEach(function(x){USERS.push(x);}); } } catch(e){}
   var found = USERS.find(function(x){ return norm(x.name)===norm(u) && x.pw===p; });
   if (!found) { document.getElementById('lerr').style.display='block'; return; }
   document.getElementById('lerr').style.display='none';
