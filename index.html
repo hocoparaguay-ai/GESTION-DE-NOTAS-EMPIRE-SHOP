@@ -121,10 +121,12 @@ input,select,textarea{width:100%;padding:9px 11px;background:#1a1a1a;border:1px 
       <div class="nav-item" onclick="go('cat')">📂 Categorías</div>
       <div class="nav-item" onclick="go('rep')">📊 Reportes</div>
       <div class="nav-item" onclick="go('cfg')">⚙️ Config</div>
+      <div class="nav-item" id="nav-log" onclick="go('log')" style="display:none">📋 Actividad</div>
     </nav>
     <div class="sb-footer">
       <div class="name" id="uname">—</div>
       <div class="role" id="urole">—</div>
+      <span class="link" onclick="openModal('mchangepw')">🔑 Cambiar contraseña</span>
       <span class="link" onclick="logout()">Cerrar sesión</span>
     </div>
   </div>
@@ -717,6 +719,73 @@ function renderAprob() {
   document.getElementById('aprob-cards').innerHTML=html;
 }
 
+function viewComp(id) {
+    var d = S.docs.find(function(x){ return x.id===id; });
+    if (!d) return;
+    var sid = d.id.replace(/['"\\]/g,'');
+    var isAdmin = S.user && S.user.role==='admin';
+    var c = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:14px">'
+        +'<div><b>N°:</b> <span style="color:var(--accent-gold)">'+d.id+'</span></div>'
+        +'<div><b>Estado:</b> <span class="status-badge status-'+(d.status?d.status.toLowerCase():'pendiente')+'">'+(d.status||'—')+'</span></div>'
+        +'<div><b>Tipo:</b> '+(d.type||'—')+'</div>'
+        +'<div><b>Fecha:</b> '+(d.date||'—').replace('T',' ')+'</div>'
+        +'<div><b>Monto:</b> <b>'+fmoney(d.amount,d.currency)+'</b></div>'
+        +'<div><b>Método:</b> '+(d.metodo||'—')+'</div>'
+        +(d.depto?'<div><b>Depto:</b> '+d.depto+'</div><div><b>Cat:</b> '+(d.cat||'—')+'</div>':'')
+        +(d.prov?'<div><b>Proveedor:</b> '+d.prov+'</div><div><b>RUC/CI:</b> '+(d.ruc||'—')+'</div>':'')
+        +(d.cli?'<div><b>Cliente:</b> '+d.cli+'</div><div><b>Doc:</b> '+(d.clidoc||'—')+'</div>':'')
+        +(d.ben?'<div><b>Beneficiario:</b> '+d.ben+'</div><div></div>':'')
+        +(d.transfer?'<div><b>Ref. transf.:</b> '+d.transfer+'</div><div></div>':'')
+        +'</div>';
+    if (d.desc) c += '<p style="font-size:13px;margin-bottom:10px"><b>Descripción:</b> '+d.desc+'</p>';
+    if (d.notes) c += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px"><i>'+d.notes+'</i></p>';
+    // Timeline
+    c += '<hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0">';
+    c += '<div style="border-left:2px solid var(--border-color);padding-left:14px">';
+    c += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--accent-gold)">Creado</div><div style="font-size:11px;color:var(--text-secondary)">Por: '+d.user+'</div></div>';
+    if (d.approvedBy) c += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#66bb6a">Aprobado</div><div style="font-size:11px;color:var(--text-secondary)">Por: '+d.approvedBy+' — '+d.approvedAt+'</div></div>';
+    if (d.rejectedBy) c += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#ef5350">Rechazado</div><div style="font-size:11px;color:var(--text-secondary)">Motivo: '+(d.rejReason||'—')+'</div></div>';
+    if (d.executedBy) c += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#C9A84C">Pagado/Emitido</div><div style="font-size:11px;color:var(--text-secondary)">Por: '+d.executedBy+' — '+d.executedAt+'</div></div>';
+    if (d.voidedBy) c += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#aaa">Anulado</div><div style="font-size:11px;color:var(--text-secondary)">Por: '+d.voidedBy+' — '+d.voidedAt+' — Motivo: '+d.voidReason+'</div></div>';
+    c += '</div>';
+    c += '<p style="font-size:10px;color:var(--text-secondary);margin-top:8px">Cod. verificación: '+(d.verif||'—')+'</p>';
+    // Buttons
+    var btns = '<button class="btn-primary" style="background:#444;color:#fff;padding:6px 14px;font-size:12px" onclick="closeModal('mview')">Cerrar</button> ';
+    btns += '<button class="btn-primary" style="padding:6px 14px;font-size:12px" onclick="printComp(''+sid+'')">🖨️ Imprimir</button> ';
+    if (d.status==='APROBADO') btns += '<button class="btn-primary" style="background:#1a6e1a;color:#fff;padding:6px 14px;font-size:12px" onclick="markPagado(''+sid+'');closeModal('mview')">💰 Marcar Pagado</button> ';
+    if (isAdmin && (d.status==='APROBADO'||d.status==='PAGADO')) btns += '<button class="btn-primary" style="background:#8a1a1a;color:#fff;padding:6px 14px;font-size:12px" onclick="anularComp(''+sid+'')">Anular</button>';
+    // Show modal
+    var mview = document.getElementById('mview');
+    if (!mview) {
+        // Create dynamic modal
+        var m = document.createElement('div');
+        m.id = 'mview'; m.className = 'modal open';
+        m.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center';
+        m.innerHTML = '<div class="modal-content" style="max-width:600px"><div class="modal-body"><h2 style="color:var(--accent-gold);margin-bottom:16px;font-family:Playfair Display">Detalle del Comprobante</h2><div id="mview-body"></div><div id="mview-btns" style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"></div></div></div>';
+        m.addEventListener('click', function(e){ if(e.target===m) document.body.removeChild(m); });
+        document.body.appendChild(m);
+    } else {
+        mview.style.display = 'flex'; mview.classList.add('open');
+    }
+    var body = document.getElementById('mview-body');
+    var bbtns = document.getElementById('mview-btns');
+    if (body) body.innerHTML = c;
+    if (bbtns) bbtns.innerHTML = btns;
+}
+
+function markPagado(id) {
+    var doc = S.docs.find(function(d){ return d.id===id; });
+    if (!doc) return;
+    var isCredit = doc.type && (doc.type.includes('CREDITO') || doc.type.includes('COBRO'));
+    doc.status = isCredit ? 'EMITIDO' : 'PAGADO';
+    doc.executedBy = S.user.name;
+    doc.executedAt = new Date().toLocaleString('es-PY');
+    lsSet('emp_docs', S.docs);
+    sbSaveDoc(doc);
+    renderComp(); renderDash();
+    toast(doc.status === 'PAGADO' ? 'Marcado como PAGADO ✓' : 'Marcado como EMITIDO ✓');
+}
+
 function reject(id) {
   var reason=prompt('Motivo del rechazo:');
   if(!reason) return;
@@ -770,17 +839,91 @@ function renderRMA() {
     var days=Math.floor((Date.now()-(r.ts||Date.now()))/(1000*60*60*24));
     var sc=days>15?'#8a1a1a':days>7?'#8a5a0a':'#1a6e1a';
     var sid=(r.id||'').replace(/['"\\]/g,'');
+    var photoIcon=(r.photos&&r.photos.length)?' 📷':'';
     html+='<tr>'
-      +'<td class="eid">'+r.id+'</td>'
+      +'<td class="eid">'+r.id+photoIcon+'</td>'
       +'<td>'+(r.cli||'—')+'</td>'
       +'<td>'+(r.prod||'—')+'</td>'
       +'<td>'+(r.marca||'—')+'</td>'
-      +'<td>'+(r.status||'—')+'</td>'
-      +'<td><span style="color:'+sc+';font-weight:700">'+days+' d</span></td>'
-      +'<td><button class="btn btn-sm" style="font-size:11px" onclick="printRMA(\''+sid+'\')">Imprimir</button></td>'
+      +'<td><span style="font-size:11px">'+r.status+'</span></td>'
+      +'<td><span style="color:'+sc+';font-weight:700">'+days+'d</span></td>'
+      +'<td style="display:flex;gap:4px">'
+      +'<button class="btn btn-sm dark" style="font-size:10px" onclick="viewRMA(\''+sid+'\')">Ver</button>'
+      +'<button class="btn btn-sm" style="font-size:10px" onclick="printRMA(\''+sid+'\')">🖨</button>'
+      +'</td>'
       +'</tr>';
   }
   document.getElementById('tbody-rma').innerHTML=html;
+}
+
+function viewRMA(id) {
+  var r=S.rmas.find(function(x){return x.id===id;});
+  if(!r)return;
+  var sid=id.replace(/['"\\]/g,'');
+  var days=Math.floor((Date.now()-(r.ts||Date.now()))/(1000*60*60*24));
+  var sc=days>15?'#ef5350':days>7?'#ffb300':'#66bb6a';
+  var resLabels={cambio:'Cambio de producto',nc:'Nota de crédito',devolucion:'Devolución de dinero',reparacion:'Reparación','sin-defecto':'Sin defecto',rechazo:'Rechazo sin garantía'};
+  var c='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:12px">'
+    +'<div><b>N°:</b> <span style="color:var(--accent-gold,#C9A84C)">'+r.id+'</span></div>'
+    +'<div><b>Estado:</b> <span style="color:'+sc+';font-weight:700">'+r.status+'</span></div>'
+    +'<div><b>Tipo:</b> '+(r.caseType||'Individual')+(r.caseType==='Grupal'?' ('+r.qty+' uds)':'')+'</div>'
+    +'<div><b>Días:</b> <span style="color:'+sc+';font-weight:700">'+days+'</span></div>'
+    +'<div><b>Cliente:</b> '+r.cli+'</div>'
+    +(r.clidoc?'<div><b>Doc:</b> '+r.clidoc+'</div>':'<div></div>')
+    +(r.tel?'<div><b>Tel:</b> '+r.tel+'</div>':'<div></div>')
+    +'<div><b>Marca:</b> '+(r.marca||'—')+'</div>'
+    +'<div><b>Producto:</b> '+(r.prod||'—')+'</div>'
+    +(r.imei?'<div><b>IMEI:</b> '+r.imei+'</div>':'<div></div>')
+    +(r.cec?'<div><b>CEC:</b> '+r.cec+'</div>':'<div></div>')
+    +(r.abaco?'<div><b>Ábaco:</b> '+r.abaco+'</div>':'<div></div>')
+    +'</div>'
+    +'<p style="font-size:13px;margin-bottom:8px"><b>Defecto:</b> '+r.def+'</p>'
+    +(r.obs?'<p style="font-size:12px;color:#888;margin-bottom:8px">Obs: '+r.obs+'</p>':'');
+
+  // FOTOS EN MINIATURA
+  if(r.photos&&r.photos.length){
+    c+='<div style="margin-bottom:14px">';
+    c+='<p style="font-size:12px;font-weight:600;color:var(--accent-gold,#C9A84C);margin-bottom:8px">📷 Fotos del producto (click para ampliar)</p>';
+    c+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    r.photos.forEach(function(p){
+      c+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid #2a2a2a;cursor:pointer;transition:transform .15s" '
+        +'onmouseover="this.style.transform=\'scale(1.15)\'" '
+        +'onmouseout="this.style.transform=\'scale(1)\'" '
+        +'onclick="window.open(this.src,\'_blank\')" title="Ver en grande">';
+    });
+    c+='</div></div>';
+  }
+
+  if(r.resType){
+    c+='<hr style="border:none;border-top:1px solid #2a2a2a;margin:10px 0">';
+    c+='<h4 style="color:var(--accent-gold,#C9A84C);font-size:13px;margin-bottom:8px">Resolución: '+(resLabels[r.resType]||r.resType)+'</h4>';
+    if(r.resNotes)c+='<p style="font-size:12px;margin-bottom:6px">'+r.resNotes+'</p>';
+    if(r.newProd)c+='<p style="font-size:12px">Producto nuevo: '+r.newProd+(r.newImei?' (IMEI: '+r.newImei+')':'')+'</p>';
+    if(r.refAmt)c+='<p style="font-size:12px">Monto: <b>'+fmoney(r.refAmt,r.refCur)+'</b></p>';
+    if(r.linkedDoc)c+='<p style="font-size:12px">Doc. generado: <span style="color:var(--accent-gold,#C9A84C)">'+r.linkedDoc+'</span></p>';
+    if(r.rejReason)c+='<p style="font-size:12px;color:#ef5350">Motivo: '+r.rejReason+'</p>';
+  }
+  if(r.envioSupp){
+    c+='<hr style="border:none;border-top:1px solid #2a2a2a;margin:10px 0">';
+    c+='<p style="font-size:12px"><b>En Envío:</b> '+r.envioSupp+' | '+( r.envioDate||'—')+' → '+(r.envioReturn||'—')+'</p>';
+  }
+  c+='<p style="font-size:10px;color:#888;margin-top:10px">Cod. verificación: '+(r.verif||'—')+'</p>';
+
+  var existing=document.getElementById('modal-rma-view');
+  if(existing)document.body.removeChild(existing);
+  var m=document.createElement('div');
+  m.id='modal-rma-view';
+  m.style.cssText='display:flex;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center';
+  m.innerHTML='<div style="background:#141414;border:1px solid #2a2a2a;border-radius:8px;width:90%;max-width:620px;max-height:90vh;overflow-y:auto;padding:24px">'
+    +'<h2 style="color:#C9A84C;margin-bottom:16px">Caso RMA — '+r.id+'</h2>'
+    +'<div>'+c+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end">'
+    +'<button onclick="this.closest(\'[id=modal-rma-view]\').remove()" style="padding:7px 14px;background:#333;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Cerrar</button>'
+    +'<button onclick="printRMA(\''+sid+'\')" style="padding:7px 14px;background:#C9A84C;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">🖨 Ticket Ingreso</button>'
+    +'</div>'
+    +'</div>';
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
+  document.body.appendChild(m);
 }
 
 // ═══════════════════════════════════════
@@ -802,7 +945,110 @@ function showCat(type) {
 // ═══════════════════════════════════════
 // CONFIG / BRANDS
 // ═══════════════════════════════════════
-function renderCfg() { renderBrands(); }
+function renderCfg() {
+    cfgTab('store');
+}
+
+function cfgTab(tab) {
+    ['store','users','brands'].forEach(function(t) {
+        var tab_el = document.getElementById('cfg-tab-'+t);
+        var panel = document.getElementById('cfg-panel-'+t);
+        if (tab_el) tab_el.className = 'tab' + (t===tab?' active':'');
+        if (panel) panel.style.display = t===tab?'':'none';
+    });
+    if (tab==='store') {
+        document.getElementById('cfg-sname').value = STORE.name||'';
+        document.getElementById('cfg-saddr').value = STORE.addr||'';
+        document.getElementById('cfg-sphone').value = STORE.phone||'';
+    }
+    if (tab==='users') renderUsers();
+    if (tab==='brands') renderBrands();
+}
+
+function openNewUser() {
+    document.getElementById('user-idx').value = -1;
+    document.getElementById('muser-title') && (document.getElementById('muser-title').innerText = 'Nuevo Usuario');
+    document.getElementById('u-name').value=''; document.getElementById('u-name').disabled=false;
+    document.getElementById('u-pw').value=''; document.getElementById('u-pw2').value='';
+    document.getElementById('u-role').value='operator';
+    document.getElementById('user-err').style.display='none';
+    openModal('muser');
+}
+
+function renderUsers() {
+    var isAdmin = S.user && S.user.role==='admin';
+    var btn = document.getElementById('btn-new-user');
+    if (btn) btn.style.display = isAdmin ? '' : 'none';
+    var html = '';
+    S.users.forEach(function(u, i) {
+        var isSelf = u.name === S.user.name;
+        html += '<tr>'
+            +'<td>'+u.name+(isSelf?' <span style="color:var(--accent-gold);font-size:10px">(yo)</span>':'')+'</td>'
+            +'<td><span class="badge badge-'+(u.role==='admin'?'gold':'gray')+'" style="font-size:10px">'+u.role+'</span></td>'
+            +'<td style="display:flex;gap:6px">'
+            +(isSelf?'<button class="btn-primary" style="padding:4px 10px;font-size:11px" onclick="openModal('mchangepw')">Mi contraseña</button>':'')
+            +(isAdmin&&!isSelf?'<button class="btn-primary" style="padding:4px 10px;font-size:11px" onclick="editUser('+i+')">Editar</button>':'')
+            +(isAdmin&&!isSelf?'<button class="btn-primary" style="padding:4px 10px;font-size:11px;background:#8a1a1a;color:#fff" onclick="deleteUser('+i+')">Eliminar</button>':'')
+            +(isAdmin&&!isSelf?'<button class="btn-primary" style="padding:4px 10px;font-size:11px;background:#1a4a8a;color:#fff" onclick="resetPw('+i+')">Reset pw</button>':'')
+            +'</td></tr>';
+    });
+    var tb = document.getElementById('users-tbody');
+    if (tb) tb.innerHTML = html;
+}
+
+function editUser(idx) {
+    document.getElementById('user-idx').value = idx;
+    document.getElementById('muser-title') && (document.getElementById('muser-title').innerText = 'Editar Usuario');
+    document.getElementById('u-name').value = S.users[idx].name;
+    document.getElementById('u-name').disabled = true;
+    document.getElementById('u-pw').value=''; document.getElementById('u-pw2').value='';
+    document.getElementById('u-role').value = S.users[idx].role;
+    document.getElementById('user-err').style.display='none';
+    openModal('muser');
+}
+
+function saveUser() {
+    var idx = parseInt(document.getElementById('user-idx').value);
+    var name = document.getElementById('u-name').value.trim().toUpperCase();
+    var pw = document.getElementById('u-pw').value;
+    var pw2 = document.getElementById('u-pw2').value;
+    var role = document.getElementById('u-role').value;
+    var err = document.getElementById('user-err');
+    err.style.display='none';
+    if (idx === -1) {
+        if (!name) { err.innerText='Nombre requerido'; err.style.display='block'; return; }
+        if (S.users.find(function(x){return x.name===name;})) { err.innerText='Ya existe ese usuario'; err.style.display='block'; return; }
+        if (!pw) { err.innerText='Contraseña requerida'; err.style.display='block'; return; }
+        if (pw!==pw2) { err.innerText='Las contraseñas no coinciden'; err.style.display='block'; return; }
+        S.users.push({name:name,pw:pw,role:role});
+    } else {
+        if (pw) {
+            if (pw!==pw2) { err.innerText='Las contraseñas no coinciden'; err.style.display='block'; return; }
+            S.users[idx].pw = pw;
+        }
+        S.users[idx].role = role;
+    }
+    saveUsers();
+    closeModal('muser');
+    renderUsers();
+    toast('Usuario guardado');
+}
+
+function deleteUser(idx) {
+    if (!confirm('¿Eliminar usuario "'+S.users[idx].name+'"?')) return;
+    S.users.splice(idx,1);
+    saveUsers();
+    renderUsers();
+    toast('Usuario eliminado');
+}
+
+function resetPw(idx) {
+    var newPw = prompt('Nueva contraseña para '+S.users[idx].name+':');
+    if (!newPw) return;
+    S.users[idx].pw = newPw;
+    saveUsers();
+    toast('Contraseña actualizada para '+S.users[idx].name);
+}
 function renderBrands() {
   document.getElementById('brands-list').innerHTML=S.brands.map(function(b){
     return '<span style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:12px">'+b+'</span>';
@@ -1083,6 +1329,259 @@ function printReport() {
 }
 
 // ═══════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════
+function exportCSV() {
+    var docs = getRepDocs();
+    var csv = 'N\u00b0,Tipo,Fecha,Descripcion,Departamento,Categoria,Monto,Moneda,Estado,Proveedor,Cliente,Beneficiario,Verificacion\n';
+    docs.forEach(function(d) {
+        csv += '"'+(d.id||'')+'","'+(d.type||'')+'","'+((d.date||'').replace('T',' '))+'","'+((d.desc||'').replace(/"/g,"'"))+'","'+(d.depto||'')+'","'+(d.cat||'')+'",'+( parseFloat(d.amount)||0)+',"'+(d.currency||'')+'","'+(d.status||'')+'","'+(d.prov||'')+'","'+(d.cli||'')+'","'+(d.ben||'')+'","'+(d.verif||'')+'"
+';
+    });
+    var a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+    a.download = 'Empire_Reporte_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();
+    toast('Excel/CSV descargado (' + docs.length + ' registros)');
+}
+
+// ═══════════════════════════════════════
+// CATEGORIAS CRUD
+// ═══════════════════════════════════════
+var currentCatTab = 'fijos';
+
+function showCatTab(tab) {
+    currentCatTab = tab;
+    document.getElementById('tab-fijos').className = 'tab' + (tab==='fijos' ? ' active' : '');
+    document.getElementById('tab-vars').className = 'tab' + (tab==='variables' ? ' active' : '');
+    var data = S.cats[tab];
+    var html = '';
+    Object.keys(data).forEach(function(dept) {
+        html += '<div class="card"><h4 style="color:var(--gold);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
+            + dept
+            + '<button class="btn sm danger" style="font-size:10px" onclick="deleteDept(''+tab+'',''+encodeURIComponent(dept)+'')">✕ Depto</button></h4>';
+        data[dept].forEach(function(cat) {
+            var ec = encodeURIComponent(cat), ed = encodeURIComponent(dept);
+            var other = tab==='fijos'?'variables':'fijos';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">'
+                + '<span>'+cat+'</span>'
+                + '<span style="display:flex;gap:4px">'
+                + '<button class="btn sm dark" style="font-size:10px;padding:2px 7px" title="Mover a '+other+'" onclick="moveCat(''+tab+'',''+ed+'',''+ec+'')">⇄</button>'
+                + '<button class="btn sm danger" style="font-size:10px;padding:2px 7px" onclick="deleteCat(''+tab+'',''+ed+'',''+ec+'')">✕</button>'
+                + '</span></div>';
+        });
+        html += '</div>';
+    });
+    document.getElementById('cat-list').innerHTML = html || '<p style="color:var(--sub)">Sin categorias. Agregá una nueva.</p>';
+    updateDeptoDatalist();
+}
+
+function updateDeptoDatalist() {
+    var all = Object.assign({}, S.cats.fijos, S.cats.variables);
+    var dl = document.getElementById('depto-opts');
+    if (dl) dl.innerHTML = Object.keys(all).map(function(d){ return '<option>'+d+'</option>'; }).join('');
+}
+
+function openAddCat() {
+    document.getElementById('cat-tipo').value = currentCatTab;
+    document.getElementById('cat-depto').value = '';
+    document.getElementById('cat-name').value = '';
+    updateDeptoDatalist();
+    openModal('mcat');
+}
+
+function saveCat() {
+    var tipo = document.getElementById('cat-tipo').value;
+    var dept = document.getElementById('cat-depto').value.trim();
+    var name = document.getElementById('cat-name').value.trim();
+    if (!dept || !name) { toast('Completá departamento y categoría'); return; }
+    if (!S.cats[tipo][dept]) S.cats[tipo][dept] = [];
+    if (S.cats[tipo][dept].indexOf(name) >= 0) { toast('Esa categoría ya existe'); return; }
+    S.cats[tipo][dept].push(name);
+    lsSet('emp_cats', S.cats);
+    closeModal('mcat');
+    showCatTab(currentCatTab);
+    loadSelects();
+    toast('Categoría agregada: ' + name);
+}
+
+function deleteCat(tipo, deptEnc, catEnc) {
+    var dept = decodeURIComponent(deptEnc), cat = decodeURIComponent(catEnc);
+    if (!confirm('¿Eliminar "'+cat+'" de '+dept+'?')) return;
+    S.cats[tipo][dept] = S.cats[tipo][dept].filter(function(c){ return c !== cat; });
+    if (!S.cats[tipo][dept].length) delete S.cats[tipo][dept];
+    lsSet('emp_cats', S.cats);
+    showCatTab(currentCatTab); loadSelects();
+    toast('Categoría eliminada');
+}
+
+function deleteDept(tipo, deptEnc) {
+    var dept = decodeURIComponent(deptEnc);
+    if (!confirm('¿Eliminar el departamento "'+dept+'" y todas sus categorías?')) return;
+    delete S.cats[tipo][dept];
+    lsSet('emp_cats', S.cats);
+    showCatTab(currentCatTab); loadSelects();
+    toast('Departamento eliminado');
+}
+
+function moveCat(fromTipo, deptEnc, catEnc) {
+    var dept = decodeURIComponent(deptEnc), cat = decodeURIComponent(catEnc);
+    var toTipo = fromTipo==='fijos'?'variables':'fijos';
+    S.cats[fromTipo][dept] = S.cats[fromTipo][dept].filter(function(c){ return c !== cat; });
+    if (!S.cats[fromTipo][dept].length) delete S.cats[fromTipo][dept];
+    if (!S.cats[toTipo][dept]) S.cats[toTipo][dept] = [];
+    S.cats[toTipo][dept].push(cat);
+    lsSet('emp_cats', S.cats);
+    showCatTab(currentCatTab); loadSelects();
+    toast('"'+cat+'" movida a '+toTipo);
+}
+
+// ═══════════════════════════════════════
+// CAMBIAR CONTRASEÑA PROPIA
+// ═══════════════════════════════════════
+function changeMyPw() {
+    var cur  = document.getElementById('cpw-cur').value;
+    var nw   = document.getElementById('cpw-new').value;
+    var nw2  = document.getElementById('cpw-new2').value;
+    var err  = document.getElementById('cpw-err');
+    err.style.display = 'none';
+    var me = S.users.find(function(x){ return x.name === S.user.name; });
+    if (!me || me.pw !== cur) { err.innerText='Contraseña actual incorrecta'; err.style.display='block'; return; }
+    if (!nw) { err.innerText='Ingresá la nueva contraseña'; err.style.display='block'; return; }
+    if (nw !== nw2) { err.innerText='Las contraseñas no coinciden'; err.style.display='block'; return; }
+    me.pw = nw;
+    saveUsers();
+    closeModal('mchangepw');
+    ['cpw-cur','cpw-new','cpw-new2'].forEach(function(id){ document.getElementById(id).value=''; });
+    toast('Contraseña cambiada correctamente');
+}
+
+// ═══════════════════════════════════════
+// ANULAR COMPROBANTE (admin only)
+// ═══════════════════════════════════════
+function reenviarComp(id) {
+    var doc = S.docs.find(function(d){ return d.id===id; });
+    if (!doc || doc.status !== 'RECHAZADO') { toast('Solo se pueden reenviar comprobantes rechazados'); return; }
+    if (!confirm('¿Reenviar este comprobante para aprobación? Se limpiará el motivo de rechazo.')) return;
+    doc.status = 'PENDIENTE';
+    doc.rejectedBy = null; doc.rejectedAt = null; doc.rejReason = null;
+    lsSet('emp_docs', S.docs);
+    sbSaveDoc(doc);
+    renderComp(); renderDash();
+    toast('Comprobante reenviado para aprobación');
+}
+
+function anularComp(id) {
+    if (!S.user || S.user.role !== 'admin') { toast('Solo el administrador puede anular'); return; }
+    var reason = prompt('Motivo de anulación (requerido):');
+    if (!reason) return;
+    var doc = S.docs.find(function(d){ return d.id===id; });
+    if (!doc) return;
+    doc.status = 'ANULADO';
+    doc.voidedBy = S.user.name;
+    doc.voidedAt = new Date().toLocaleString('es-PY');
+    doc.voidReason = reason;
+    lsSet('emp_docs', S.docs);
+    sbSaveDoc(doc);
+    renderComp(); renderDash();
+    toast('Comprobante anulado');
+}
+
+// ═══════════════════════════════════════
+// EDIT COMPROBANTE (admin, pending only)
+// ═══════════════════════════════════════
+function editComp(id) {
+    if (!S.user || S.user.role !== 'admin') { toast('Solo el administrador puede editar'); return; }
+    var doc = S.docs.find(function(d){ return d.id===id; });
+    if (!doc || doc.status !== 'PENDIENTE') { toast('Solo se pueden editar comprobantes PENDIENTES'); return; }
+    document.getElementById('c-edit-id') && (document.getElementById('c-edit-id').value = id);
+    document.getElementById('c-tipo').value = doc.type;
+    document.getElementById('c-fecha').value = doc.date || '';
+    document.getElementById('c-mon').value = doc.currency || 'GS';
+    document.getElementById('c-monto').value = doc.amount || '';
+    document.getElementById('c-metodo').value = doc.metodo || '';
+    updateCompFields();
+    loadSelects();
+    document.getElementById('c-depto').value = doc.depto || '';
+    updateCompCats();
+    document.getElementById('c-cat').value = doc.cat || '';
+    document.getElementById('c-desc').value = doc.desc || '';
+    document.getElementById('c-prov').value = doc.prov || '';
+    document.getElementById('c-ruc').value = doc.ruc || '';
+    document.getElementById('c-cli').value = doc.cli || '';
+    document.getElementById('c-clidoc').value = doc.clidoc || '';
+    document.getElementById('c-ref').value = doc.ref || '';
+    document.getElementById('c-ben').value = doc.ben || '';
+    openModal('mcomp');
+}
+
+// ═══════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════
+var STORE = lsGet('emp_settings', {name:'Empire Shop',addr:'Edificio Jebai — Ciudad del Este, PY',phone:''});
+function applySettings() {
+    var n = document.getElementById('sb-store-name');
+    var a = document.getElementById('sb-store-addr');
+    if(n) n.innerText = STORE.name || 'Empire Shop';
+    if(a) a.innerText = STORE.addr || '';
+}
+function saveSettings() {
+    STORE.name  = document.getElementById('cfg-sname').value;
+    STORE.addr  = document.getElementById('cfg-saddr').value;
+    STORE.phone = document.getElementById('cfg-sphone').value;
+    lsSet('emp_settings', STORE);
+    applySettings();
+    DB.from('settings').upsert([{key:'store_name',value:STORE.name},{key:'store_address',value:STORE.addr},{key:'store_phone',value:STORE.phone}]).then(function(){});
+    toast('Configuración guardada');
+}
+
+// ═══════════════════════════════════════
+// ACTIVITY LOG
+// ═══════════════════════════════════════
+var ACTLOG = lsGet('emp_log', []);
+function logActivity(action, detail) {
+    var e = {id: Date.now().toString(36), user: S.user?S.user.name:'—', action:action, detail:detail, ts:new Date().toLocaleString('es-PY')};
+    ACTLOG.unshift(e); if(ACTLOG.length>200) ACTLOG.pop();
+    lsSet('emp_log', ACTLOG);
+    DB.from('activity_log').insert({id:e.id,user_name:e.user,action:action,detail:detail}).catch(function(){});
+}
+function renderLog() {
+    var list = document.getElementById('log-list');
+    if (!list) return;
+    list.innerHTML = ACTLOG.slice(0,100).map(function(e){
+        return '<div style="padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px"><b>'+e.action+'</b> — '+e.detail+'<div style="font-size:10px;color:var(--sub);margin-top:2px">'+e.user+' | '+e.ts+'</div></div>';
+    }).join('') || '<div style="padding:20px;text-align:center;color:var(--sub)">Sin actividad registrada</div>';
+}
+
+// ═══════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════
+function playNotif() {
+    try {
+        var ctx = new (window.AudioContext||window.webkitAudioContext)();
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.3, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.5);
+        o.start(); o.stop(ctx.currentTime+0.5);
+    } catch(e) {}
+}
+
+// Poll for approvals (operators)
+function startPoll() {
+    setInterval(function() {
+        if (!S.user || S.user.role === 'admin') return;
+        var prev = parseInt(lsGet('emp_last_apro', 0));
+        var curr = S.docs.filter(function(d){ return d.status==='APROBADO'; }).length;
+        if (curr > prev) { playNotif(); toast('Comprobante aprobado ✅'); }
+        lsSet('emp_last_apro', curr);
+        sbLoad();
+    }, 30000);
+}
+
+// ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
 document.getElementById('c-fecha').value = new Date().toISOString().slice(0,16);
@@ -1091,5 +1590,48 @@ document.getElementById('c-ben').addEventListener('change', function(){
   document.getElementById('c-ben-otro').style.display = this.value==='otro'?'':'none';
 });
 </script>
+
+<!-- MODAL: CATEGORIA -->
+<div class="modal" id="mcat">
+<div class="mbox sm" style="max-width:440px">
+  <h2>Nueva Categoría</h2>
+  <div style="margin-bottom:12px"><label>Tipo de gasto</label>
+    <select id="cat-tipo"><option value="fijos">Gasto Fijo</option><option value="variables">Gasto Variable</option></select>
+  </div>
+  <div style="margin-bottom:12px"><label>Departamento</label>
+    <input type="text" id="cat-depto" placeholder="Ej: Operativos" list="depto-opts">
+    <datalist id="depto-opts"></datalist>
+  </div>
+  <div style="margin-bottom:16px"><label>Nombre de la categoría</label>
+    <input type="text" id="cat-name" placeholder="Ej: Luz — Local">
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-sm btn-dark" onclick="closeModal('mcat')">Cancelar</button>
+    <button class="btn btn-sm" onclick="saveCat()">Guardar</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL: CAMBIAR CONTRASEÑA -->
+<div class="modal" id="mchangepw">
+<div class="mbox sm" style="max-width:400px">
+  <h2>Cambiar mi contraseña</h2>
+  <div style="margin-bottom:12px"><label>Contraseña actual</label>
+    <div class="pw-wrap"><input type="password" id="cpw-cur" placeholder="Contraseña actual"><span class="eye" onclick="toggleEye('cpw-cur',this)">👁</span></div>
+  </div>
+  <div style="margin-bottom:12px"><label>Nueva contraseña</label>
+    <div class="pw-wrap"><input type="password" id="cpw-new" placeholder="Nueva contraseña"><span class="eye" onclick="toggleEye('cpw-new',this)">👁</span></div>
+  </div>
+  <div style="margin-bottom:16px"><label>Confirmar nueva contraseña</label>
+    <div class="pw-wrap"><input type="password" id="cpw-new2" placeholder="Repetir nueva contraseña"><span class="eye" onclick="toggleEye('cpw-new2',this)">👁</span></div>
+  </div>
+  <div id="cpw-err" style="color:#ef5350;font-size:12px;margin-bottom:10px;display:none"></div>
+  <div class="form-actions">
+    <button class="btn btn-sm btn-dark" onclick="closeModal('mchangepw')">Cancelar</button>
+    <button class="btn btn-sm" onclick="changeMyPw()">Cambiar</button>
+  </div>
+</div>
+</div>
+
 </body>
 </html>
